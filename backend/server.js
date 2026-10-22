@@ -3,10 +3,17 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer";
+import { fileURLToPath } from "node:url";
+import session from "express-session";
+import MongoStore from "connect-mongo";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createStudyRouter } from "./studyRoutes.js";
+import authRouter from "./routes/authRoutes.js";
+import userDataRouter from "./routes/documentRoutes.js";
+import requireAuth from "./middleware/requireAuth.js";
+import { connectDatabase } from "./config/database.js";
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL("./.env", import.meta.url)) });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,9 +33,15 @@ if (!MODEL) {
   );
 }
 
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET is missing from the backend .env file.");
+}
+
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
+
+const databaseConnection = connectDatabase();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -38,8 +51,32 @@ const upload = multer({
   },
 });
 
-app.use(cors());
-app.use(express.json({ limit: "2mb" }));
+const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim());
+
+app.set("trust proxy", 1);
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(express.json({ limit: "15mb" }));
+app.use(session({
+  name: "vocaread.sid",
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    clientPromise: databaseConnection,
+    dbName: "vocaread",
+  }),
+  cookie: {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  },
+}));
+
+app.use("/api/auth", authRouter);
+app.use("/api/data", userDataRouter);
 
 app.get("/", (req, res) => {
   res.json({
@@ -61,6 +98,7 @@ app.get("/api/health", (req, res) => {
 
 app.use(
   "/api/study",
+  requireAuth,
   createStudyRouter({
     ai,
     generationModel: MODEL,
@@ -76,7 +114,7 @@ app.get("/api/explain-text", (req, res) => {
   });
 });
 
-app.post("/api/explain-text", async (req, res) => {
+app.post("/api/explain-text", requireAuth, async (req, res) => {
   const { selectedText, context = "", language = "english", mode = "auto" } =
     req.body || {};
 
@@ -195,6 +233,7 @@ ${selected}
 
 app.post(
   "/api/process-document",
+  requireAuth,
   upload.single("originalFile"),
   async (req, res) => {
     try {
@@ -338,7 +377,7 @@ ${safeExtractedText}
           "The Gemini request or uploaded file was rejected. Check the model and request configuration.";
       } else if (status === 401) {
         clientMessage =
-          "Gemini authentication failed. Check the API key configuration.";
+          "Gemini rejected the API key. Update GEMINI_API_KEY in backend/.env with a valid Gemini API key, then restart the backend.";
       } else if (status === 403) {
         clientMessage =
           "Gemini access was denied. Check your project's API permissions.";
@@ -389,9 +428,14 @@ app.use((error, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(
-    `VocaRead backend running at http://localhost:${PORT}`
-  );
-  console.log(`Gemini model configured: ${MODEL}`);
-});
+databaseConnection
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`VocaRead backend running at http://localhost:${PORT}`);
+      console.log(`Gemini model configured: ${MODEL}`);
+    });
+  })
+  .catch((error) => {
+    console.error("Backend startup failed:", error.message);
+    process.exit(1);
+  });

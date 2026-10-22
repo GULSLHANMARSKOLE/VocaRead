@@ -8,8 +8,8 @@ VocaRead is a web-based document reading and study application designed to make 
 - **Text-to-Speech:** Listen to document content through browser-based speech synthesis.
 - **Voice Controls:** Control reading through supported voice commands, including playback, pause, resume, repeat, and navigation.
 - **Interactive Reading:** View structured document content and follow the reading experience through the application interface.
-- **Document Library:** Organize and revisit saved documents using the application's document storage functionality.
-- **Study Workspace:** Access a dedicated workspace for study-related interactions and assessments.
+- **Document Library:** Save, continue, rename, and manage documents stored in MongoDB under the signed-in account.
+- **Study Workspace:** Ask document-grounded questions and generate, take, and review saved assessments linked to your account.
 - **Modular Architecture:** Separate React components and document-processing utilities make the application easier to maintain and extend.
 
 ## 🛠️ Tech Stack
@@ -27,9 +27,18 @@ VocaRead is a web-based document reading and study application designed to make 
 - Express.js
 - JavaScript
 - REST API routes for study-related functionality
+- MongoDB Atlas for accounts and server-side sessions
+
+### Authentication setup
+
+1. In MongoDB Atlas, create a database user, allow your development IP in Network Access, and copy the application connection string.
+2. Copy `backend/.env.example` to `backend/.env`, then set `MONGODB_URI`, a long random `SESSION_SECRET`, and your Gemini settings. Keep `.env` private and never commit it.
+3. Start the backend with `npm run server` from the project root and the frontend with `npm run dev` in another terminal. Vite forwards `/api` requests to the backend.
+4. Register through the app. Passwords are stored as bcrypt hashes, and login state uses an HTTP-only session cookie stored in MongoDB.
+
+For deployment, set `CLIENT_ORIGIN` to the frontend's exact origin (comma-separated if needed) and serve the frontend and backend over HTTPS.
 
 ### Planned Enhancements
-- MongoDB integration for persistent server-side data storage
 - Expanded AI-assisted study features
 - Improved document organization and learning analytics
 - Production deployment
@@ -152,8 +161,10 @@ Some browser-based speech and voice-recognition features depend on browser suppo
 
 ## 🗺️ Roadmap
 
-- [ ] Complete MongoDB integration for persistent data storage.
-- [ ] Improve document management and user-specific data persistence.
+- [x] Add MongoDB Atlas account and session storage with registration, login, and logout.
+- [x] Store documents, study indexes, assessments, and submitted attempts in MongoDB per user.
+- [x] Migrate existing browser-saved documents and assessments to the signed-in account.
+- [ ] Improve document management and learning analytics.
 - [ ] Expand AI-assisted study and document-understanding capabilities.
 - [ ] Add automated tests for document processing and backend routes.
 - [ ] Deploy the application with production-ready configuration.

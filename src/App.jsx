@@ -1,6 +1,11 @@
 
 import { useEffect, useRef, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import TopNavigation from "./components/layout/TopNavigation";
+import { useAuth } from "./context/AuthContext";
 import VoiceControl from "./components/VoiceControl";
 import FileUploader from "./components/FileUploader";
 import StructuredDocument from "./components/StructuredDocument";
@@ -15,9 +20,6 @@ import {
    renameDocument,
    saveDocument,
    updateReadingProgress,
-   deleteStudyIndex,
-   deleteAssessment,
-   listAssessments
  } from  "./utils/documentStorage";
 
 
@@ -166,7 +168,7 @@ const splitReadableSentences = (sourceText) => {
   return sentences.filter(Boolean);
 };
 
-function App() {
+function ReaderApp() {
   const [text, setText] = useState("");
   const [originalFile, setOriginalFile] = useState(null);
   const [originalFileName, setOriginalFileName] = useState("");
@@ -201,6 +203,7 @@ function App() {
   const [voiceResetSignal, setVoiceResetSignal] = useState(0);
   const [currentView, setCurrentView] = useState("home");
   const [studyInitialTab, setStudyInitialTab] = useState("ask");
+  const [studyNavigationTarget, setStudyNavigationTarget] = useState("workspace");
   const [studyNavigationKey, setStudyNavigationKey] = useState(0);
 
   const speechSessionRef = useRef(0);
@@ -260,7 +263,7 @@ function App() {
       return documents;
     } catch (error) {
       setDocumentLibraryError(
-        error.message || "Could not load saved documents from this browser.",
+        error.message || "Could not load saved documents from your account.",
       );
       return null;
     }
@@ -387,7 +390,7 @@ function App() {
       .catch((error) => {
         if (isMounted) {
           setDocumentLibraryError(
-            error.message || "Could not load saved documents from this browser.",
+            error.message || "Could not load saved documents from your account.",
           );
         }
       })
@@ -665,9 +668,10 @@ function App() {
     setExplanationError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/explain-text", {
+      const response = await fetch("/api/explain-text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         signal: controller.signal,
         body: JSON.stringify({
           selectedText: selected,
@@ -742,14 +746,14 @@ function App() {
       ) {
         if (error instanceof TypeError && import.meta.env.DEV) {
           console.error("Could not reach the VocaRead explain endpoint:", {
-            endpoint: "http://localhost:5000/api/explain-text",
+            endpoint: "/api/explain-text",
             message: error.message,
           });
         }
 
         setExplanationError(
           error instanceof TypeError
-            ? "Could not reach the backend at http://localhost:5000. Start or restart the VocaRead backend, then retry."
+            ? "Could not reach the backend. Start or restart the VocaRead backend, then retry."
             : error.message || "Could not generate an explanation. Please retry.",
         );
       }
@@ -862,7 +866,7 @@ function App() {
       return saved.id;
     } catch (error) {
       setDocumentSaveStatus(
-        error.message || "Could not save this document in browser storage.",
+        error.message || "Could not save this document to your account.",
       );
       return null;
     } finally {
@@ -880,6 +884,7 @@ function App() {
 
     if (id) {
       setStudyInitialTab(tab);
+      setStudyNavigationTarget(tab === "assessments" ? "assessments" : "workspace");
       setStudyNavigationKey((key) => key + 1);
       setCurrentView("study");
     }
@@ -1018,19 +1023,7 @@ function App() {
       await flushProgressWrite();
     }
 
-    // Remove the document's RAG index and chunks.
-    await deleteStudyIndex(id);
-
-    // Remove assessments belonging to this document.
-    const assessments = await listAssessments();
-
-    for (const assessment of assessments) {
-      if (assessment.documentId === id) {
-        await deleteAssessment(assessment.id);
-      }
-    }
-
-    // Delete the document itself.
+    // The cloud endpoint also removes this document's index and assessments.
     await deleteDocument(id);
 
     setSavedDocuments((documents) =>
@@ -1189,9 +1182,10 @@ function App() {
       }
 
       const response = await fetch(
-        "http://localhost:5000/api/process-document",
+        "/api/process-document",
         {
           method: "POST",
+        credentials: "include",
           body: formData,
         }
       );
@@ -1524,11 +1518,52 @@ function App() {
 
   return (
     <div className="app">
-      <h1>VocaRead</h1>
-
-      <p className="subtitle">
-        Read your documents aloud, one sentence at a time.
-      </p>
+      {currentView === "home" ? (
+        <section className="home-hero" aria-labelledby="home-hero-title">
+          <div className="home-hero-copy">
+            <span className="home-hero-eyebrow">READ · UNDERSTAND · REMEMBER</span>
+            <h1 id="home-hero-title">Make every document a <span>learning moment.</span></h1>
+            <p>
+              VocaRead turns your documents into an active study space. Listen as you read,
+              ask questions about the material, and build practice quizzes from what you learn.
+            </p>
+            <div className="home-hero-highlights" aria-label="VocaRead features">
+              <span>Listen while you read</span>
+              <span>Study with AI</span>
+              <span>Practice with quizzes</span>
+            </div>
+          </div>
+          <div className="home-hero-art" aria-hidden="true">
+            <div className="hero-art-orbit hero-art-orbit-one" />
+            <div className="hero-art-orbit hero-art-orbit-two" />
+            <div className="hero-art-note hero-art-note-one">Aa</div>
+            <div className="hero-art-note hero-art-note-two">♫</div>
+            <div className="hero-book">
+              <div className="hero-book-page hero-book-page-left">
+                <span className="hero-book-kicker">YOUR LIBRARY</span>
+                <span className="hero-book-title">Read with<br />understanding.</span>
+                <i /><i /><i />
+                <span className="hero-book-word">Listen · Learn · Grow</span>
+              </div>
+              <div className="hero-book-page hero-book-page-right">
+                <svg className="hero-book-pen" viewBox="0 0 32 32" role="img" aria-label="Pen">
+                  <path d="m7 22 1.4-5.1L21 4.3a2.8 2.8 0 0 1 4 4L12.4 20.9 7 22Z" />
+                  <path d="m17.7 7.6 4.7 4.7M7 22l-1.2 4.2L10 25" />
+                </svg>
+                <span className="hero-book-wave" />
+                <span className="hero-book-wave short" />
+                <span className="hero-book-wave" />
+              </div>
+            </div>
+            <div className="hero-art-caption">A little more clarity, one page at a time.</div>
+          </div>
+        </section>
+      ) : (
+        <header className="compact-app-heading">
+          <span className="compact-app-mark" aria-hidden="true">V</span>
+          <span>VocaRead</span>
+        </header>
+      )}
 
       <nav className="vocaread-navigation" aria-label="Main navigation">
         <button
@@ -1541,18 +1576,19 @@ function App() {
         </button>
         <button
           type="button"
-          className={currentView === "study" && studyInitialTab !== "assessments" ? "active" : ""}
-          aria-current={currentView === "study" && studyInitialTab !== "assessments" ? "page" : undefined}
+          className={currentView === "study" && studyNavigationTarget === "workspace" ? "active" : ""}
+          aria-current={currentView === "study" && studyNavigationTarget === "workspace" ? "page" : undefined}
           onClick={() => enterStudyWorkspace("ask")}
         >
           Study Workspace
         </button>
         <button
           type="button"
-          className={currentView === "study" && studyInitialTab === "assessments" ? "active" : ""}
-          aria-current={currentView === "study" && studyInitialTab === "assessments" ? "page" : undefined}
+          className={currentView === "study" && studyNavigationTarget === "assessments" ? "active" : ""}
+          aria-current={currentView === "study" && studyNavigationTarget === "assessments" ? "page" : undefined}
           onClick={() => {
             setStudyInitialTab("assessments");
+            setStudyNavigationTarget("assessments");
             setStudyNavigationKey((key) => key + 1);
             setCurrentView("study");
           }}
@@ -1773,11 +1809,28 @@ function App() {
           documentId={activeDocumentId}
           savedDocuments={savedDocuments}
           initialTab={studyInitialTab}
+          onNavigationTargetChange={setStudyNavigationTarget}
           onOpenDocument={handleOpenSavedDocument}
           onGoHome={() => setCurrentView("home")}
         />
       )}
     </div>
+  );
+}
+
+function App() {
+  const { user, authLoading } = useAuth();
+
+  if (authLoading) {
+    return <main className="auth-loading" role="status">Loading your account…</main>;
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/register" element={user ? <Navigate to="/" replace /> : <RegisterPage />} />
+      <Route path="*" element={user ? <><TopNavigation /><ReaderApp /></> : <Navigate to="/login" replace />} />
+    </Routes>
   );
 }
 

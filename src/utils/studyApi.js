@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:5000/api/study";
+const API_BASE_URL = "/api/study";
 
 async function readJsonResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -35,6 +35,7 @@ async function postJson(path, body, signal) {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       signal,
       body: JSON.stringify(body),
     });
@@ -51,7 +52,10 @@ async function postJson(path, body, signal) {
 export async function getStudyConfig(signal) {
   let response;
   try {
-    response = await fetch(`${API_BASE_URL}/config`, { signal });
+    response = await fetch(`${API_BASE_URL}/config`, {
+      credentials: "include",
+      signal,
+    });
   } catch (error) {
     if (error.name === "AbortError") {
       throw error;

@@ -119,6 +119,10 @@ function AssessmentResults({ assessment, reviewAttempt = null, onClose, onAttemp
         </>
       ) : (
         <>
+          <div className="assessment-test-label">
+            <span>Assessment in progress</span>
+            <span>{assessment.questionCount || assessment.questions.length} questions</span>
+          </div>
           <div className="assessment-question-heading">
             <strong>Question {questionIndex + 1} of {assessment.questions.length}</strong>
             <span>{Object.keys(answers).length} answered</span>
@@ -134,7 +138,10 @@ function AssessmentResults({ assessment, reviewAttempt = null, onClose, onAttemp
             <fieldset>
               <legend className="visually-hidden">Select one answer</legend>
               {activeQuestion.options.map((option) => (
-                <label className="assessment-option" key={option.id}>
+                <label
+                  className={`assessment-option ${answers[activeQuestion.id] === option.id ? "selected" : ""}`}
+                  key={option.id}
+                >
                   <input
                     type="radio"
                     name={`question-${activeQuestion.id}`}
@@ -151,16 +158,13 @@ function AssessmentResults({ assessment, reviewAttempt = null, onClose, onAttemp
                 </label>
               ))}
             </fieldset>
-            <p className="study-citation-label">
-              Source: {activeQuestion.sourceLabels?.join(", ") || "Document passage"}
-            </p>
           </article>
           <div className="assessment-question-nav" aria-label="Question navigation">
             {assessment.questions.map((question, index) => (
               <button
                 key={question.id}
                 type="button"
-                className={index === questionIndex ? "selected" : ""}
+                className={`${index === questionIndex ? "selected" : ""} ${answers[question.id] ? "answered" : ""}`.trim()}
                 aria-label={`Go to question ${index + 1}${answers[question.id] ? ", answered" : ", unanswered"}`}
                 onClick={() => setQuestionIndex(index)}
               >

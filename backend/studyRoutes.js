@@ -17,8 +17,10 @@ function publicGeminiError(error) {
   const message =
     status === 429
       ? "Gemini quota or rate limit exceeded. Try again later."
-      : status === 401 || status === 403
-        ? "Gemini authentication failed. Check the backend configuration."
+      : status === 401
+        ? "Gemini rejected the API key. Update GEMINI_API_KEY in backend/.env with a valid Gemini API key, then restart the backend."
+        : status === 403
+          ? "Gemini denied access. Check that the key's Google project can use the Gemini API."
         : status === 404
           ? "A configured Gemini model was not found. Check the model settings."
           : status === 503 || status === 504
@@ -320,6 +322,7 @@ export function createStudyRouter({
         name: error?.name,
         status: error?.status,
         code: error?.code,
+        message: error?.message,
       });
       const publicError = publicGeminiError(error);
       return res.status(publicError.status).json({ error: publicError.message });
@@ -360,6 +363,7 @@ export function createStudyRouter({
         name: error?.name,
         status: error?.status,
         code: error?.code,
+        message: error?.message,
       });
       const publicError = publicGeminiError(error);
       return res.status(publicError.status).json({ error: publicError.message });
@@ -464,6 +468,7 @@ ${buildEvidence(validPassages)}`;
         name: error?.name,
         status: error?.status,
         code: error?.code,
+        message: error?.message,
       });
       const publicError = publicGeminiError(error);
       return res.status(publicError.status).json({ error: publicError.message });
@@ -621,6 +626,7 @@ ${buildEvidence(referencedChunks)}`;
         name: error?.name,
         status: error?.status,
         code: error?.code,
+        message: error?.message,
       });
       const publicError = publicGeminiError(error);
       return res.status(publicError.status).json({ error: publicError.message });

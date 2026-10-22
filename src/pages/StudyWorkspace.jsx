@@ -167,6 +167,7 @@ function StudyWorkspace({
   initialTab = "ask",
   onOpenDocument,
   onGoHome,
+  onNavigationTargetChange,
 }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [documentRecord, setDocumentRecord] = useState(null);
@@ -194,6 +195,7 @@ function StudyWorkspace({
   const [assessmentError, setAssessmentError] = useState("");
   const [assessmentToDelete, setAssessmentToDelete] = useState(null);
   const [attemptLoadError, setAttemptLoadError] = useState("");
+  const openedFromSavedAssessmentsRef = useRef(false);
 
   const indexRequestRef = useRef(0);
   const chatRequestRef = useRef(0);
@@ -201,6 +203,14 @@ function StudyWorkspace({
   const generationAbortRef = useRef(null);
   const indexAbortRef = useRef(null);
   const indexedChunksRef = useRef([]);
+
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+    setAssessment(null);
+    setReviewAttempt(null);
+    openedFromSavedAssessmentsRef.current = false;
+    onNavigationTargetChange?.(tab === "assessments" ? "assessments" : "workspace");
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -635,7 +645,9 @@ function StudyWorkspace({
       setAssessment(stored);
       setReviewAttempt(attempt);
       setAttemptLoadError("");
+      openedFromSavedAssessmentsRef.current = true;
       setActiveTab("mcq");
+      onNavigationTargetChange?.("assessments");
     } catch (error) {
       setAttemptLoadError(error.message || "Could not open this assessment.");
     }
@@ -700,7 +712,7 @@ function StudyWorkspace({
         <span>
           {documentRecord?.originalFileName ||
             documentRecord?.fileType ||
-            "Browser-local document"}
+            "Saved to your account"}
         </span>
       </div>
 
@@ -720,7 +732,7 @@ function StudyWorkspace({
             role="tab"
             aria-selected={activeTab === tab}
             className={activeTab === tab ? "active" : ""}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => selectTab(tab)}
           >
             {label}
           </button>
@@ -738,7 +750,7 @@ function StudyWorkspace({
           <h3>Choose a document to study</h3>
           <p>
             Save a document in the reader, then select it here. Its searchable
-            index stays in this browser.
+            index is saved to your account.
           </p>
           {savedDocuments.length === 0 && (
             <button type="button" onClick={onGoHome}>
@@ -924,6 +936,11 @@ function StudyWorkspace({
               onClose={() => {
                 setAssessment(null);
                 setReviewAttempt(null);
+                if (openedFromSavedAssessmentsRef.current) {
+                  openedFromSavedAssessmentsRef.current = false;
+                  setActiveTab("assessments");
+                  onNavigationTargetChange?.("assessments");
+                }
               }}
               onAttemptSaved={refreshAssessments}
             />
@@ -936,7 +953,7 @@ function StudyWorkspace({
                   <h3>Saved Assessments</h3>
                   <p>
                     Assessment questions and submitted attempts are stored
-                    locally in this browser.
+                    to your VocaRead account.
                   </p>
                 </div>
                 <button type="button" onClick={refreshAssessments}>
